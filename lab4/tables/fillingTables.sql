@@ -22,34 +22,102 @@ insert into stations (name)
 select 'Станция ' || generate_series(1, 1000)
 on conflict do nothing;
 
---1k
-insert into trains ("trainNumber", "categoryID", "headStation", "quantityWagon")
-select 'Поезд_' || gs::text          AS "trainNumber",
-       (select "categoryID"
-        from "trainCategories"
-        order by random()
-        limit 1)                     AS "categoryID",
-       (select "departureStation"
-        from routes
-        order by random()
-        limit 1)                     AS "headStation",
-       floor(random() * 21 + 5)::int AS "quantityWagon" -- [5, 20]
-from generate_series(1, 1000) gs
-on conflict do nothing;
-
 --5k
-insert into wagons ("trainID", capacity, "wagonTypeID")
-select (select id from trains order by random() limit 1),
-       floor(random() * 50 + 1)::int, -- [1, 50]
-       (select id from "wagonType" order by random() limit 1)
-from generate_series(1, 5000)
-on conflict do nothing;
+do
+$$
+    declare
+        departureID int;
+        arrivalID   int;
+    begin
+        for _ in 1..5000
+            loop
+                select id from stations order by random() limit 1 into departureID;
+                select id from stations order by random() limit 1 into arrivalID;
+                if arrivalID = departureID then
+                    continue;
+                end if;
+                insert into routes("departureStation", "arrivalStation")
+                values (departureID,
+                        arrivalID)
+                on conflict
+                    do nothing;
+            end loop;
+    end;
+$$;
+
+--1k
+do
+$$
+    declare
+        cur_categoryID    int;
+        cur_headStationID int;
+    begin
+
+        for i in 1..1000
+            loop
+                select "categoryID"
+                from "trainCategories"
+                order by random()
+                limit 1
+                into cur_categoryID;
+
+                select id
+                from stations
+                order by random()
+                limit 1
+                into cur_headStationID;
+
+                insert into trains("trainNumber", "categoryID", "headStationID", "quantityWagon")
+                values ('Поезд_' || i::varchar,
+                        cur_categoryID,
+                        cur_headStationID,
+                        floor(random() * 21 + 5)::int -- [5, 20]
+                       );
+            end loop;
+    end;
+$$;
+
+do
+$$
+    begin
+        for i in 1..20000
+            loop
+                insert into schedule ("routeID", "trainID")
+                values ((select id from routes order by random() limit 1),
+                        (select id from trains order by random() limit 1))
+                on conflict do nothing;
+            end loop;
+    end;
+$$;
+
+--20k
+
+
+--trains_quantity * trains_wagons_quantity
+do
+$$
+    declare
+        cur_trainID int;
+        cur_quantityWagons int;
+    begin
+        for cur_trainID, cur_quantityWagons in (select id, "quantityWagon" from trains)
+            loop
+                for _ in 1..cur_quantityWagons
+                    loop
+                        insert into wagons ("trainID", capacity, "wagonTypeID")
+                        values (cur_trainID,
+                                floor(random() * 50 + 1)::int, -- [1, 50]
+                                (select id from "wagonType" order by random() limit 1));
+                    end loop;
+            end loop;
+    end;
+$$;
 
 --75k
 do
 $$
     declare
-        surname           text[] := array [
+        surname           varchar[] := array [
             'Иванов', 'Наумов', 'Флях', 'Белый', 'Резников',
             'Самоваров', 'Сборщик', 'Андреев', 'Красный', 'Черный',
             'Добрый', 'Петров', 'Сидоров', 'Кузнецов', 'Смирнов',
@@ -84,7 +152,7 @@ $$
             'Белов', 'Сычев', 'Кузнецов', 'Семенов', 'Ковалев',
             'Петров', 'Сидоров', 'Лебедев', 'Федоров', 'Григорьев',
             'Тихонов', 'Сергеев', 'Морозов', 'Данилов'];
-        name              text[] := array [
+        name              varchar[] := array [
             'Иван', 'Александр', 'Михаил', 'Сергей', 'Андрей',
             'Григорий', 'Владимир', 'Егор', 'Рамиль', 'Наиль',
             'Дмитрий', 'Арсений', 'Денис', 'Анатолий', 'Константин',
@@ -121,7 +189,7 @@ $$
             'Павел', 'Алексей', 'Анатолий', 'Станислав', 'Кирилл',
             'Ярослав', 'Тимур', 'Федор', 'Юрий', 'Арсений',
             'Денис', 'Григорий'];
-        patronymics       text[] := array [ null,
+        patronymics       varchar[] := array [ null,
             'Алексеевич', 'Александрович', 'Андреевич', 'Борисович', 'Васильевич',
             'Викторович', 'Григорьевич', 'Дмитриевич', 'Евгеньевич', 'Иванович',
             'Константинович', 'Леонидович', 'Михайлович', 'Николаевич', 'Олегович',
@@ -141,19 +209,17 @@ $$
             'Юрьевич', 'Яковлевич', 'Анисимович', 'Борисович', 'Викентьевич',
             'Георгиевич', 'Данилович', 'Егорович', 'Зиновьевич', 'Измайлович'
             ];
-        positions         text[] := array
+        positions         varchar[] := array
             ['Кассир', 'Дежурный по станции', 'Машинист', 'Проводник', 'Начальник поезда', 'Инженер', 'Менеджер'];
         random_surname    varchar(50);
         random_name       varchar(50);
         random_patronymic varchar(50);
         random_passport   text;
-        -- =====
+        -- ==========================================
         cur_station       record;
         cur_train         record;
         employee_count    int;
         cur_employee_id   int;
-        manager_id        int;
-        brigade_id        int;
 
     begin
 
@@ -166,13 +232,13 @@ $$
 
                 select patronymics[1 + floor(random() * array_length(name, 1))] into random_patronymic;
 
-                select floor(random() * 8000000000) + 1231231234 into random_passport;
+                select (floor(random() * 8000000000) + 1231231234)::varchar into random_passport;
 
                 insert into passengers ("passportData", firstname, surname, patronymic)
                 values (random_passport, random_name, random_surname, random_patronymic);
             end loop;
 
-
+        --===============================================================================
         --employees
 
         -- Перебираем все станции
@@ -196,7 +262,7 @@ $$
                     end loop;
             end loop;
 
-        -- Теперь назначаем начальников (менеджеров) случайным сотрудникам
+-- Теперь назначаем начальников (менеджеров) случайным сотрудникам
         update employees
         set "managerID" = (select id
                            from employees e2
@@ -206,10 +272,11 @@ $$
         where position = 'Менеджер';
 
         -- Теперь назначаем сотрудников в поездные бригады
-        for cur_train in (select id, "headStation" from trains)
+        for cur_train in (select id, "headStationID" from trains)
             loop
+
                 -- Назначаем бригаду только сотрудникам станции формирования поезда
-                for cur_employee_id in (select id from employees where "stationID" = cur_train."headStation")
+                for cur_employee_id in (select id from employees where "stationID" = cur_train."headStationID")
                     loop
                         -- Выбираем случайную должность для бригады
                         if random() < 0.5 then -- 50% шанс попадания в бригаду
@@ -224,19 +291,6 @@ $$
     end
 $$;
 
---5k
-insert into routes ("departureStation", "arrivalStation")
-select (select id from stations order by random() limit 1),
-       (select id from stations order by random() limit 1)
-from generate_series(1, 5000)
-on conflict do nothing;
-
---20k
-insert into schedule ("routeID", "trainID")
-select (select id from routes order by random() limit 1),
-       (select id from trains order by random() limit 1)
-from generate_series(1, 20000)
-on conflict do nothing;
 
 --routes size
 do
@@ -292,11 +346,11 @@ $$
 
                 select id from passengers order by random() limit 1 into cur_passengerID;
 
-
                 select count(*) from "routeStations" where "routeID" = cur_routeID into cur_stationsQuantity;
 
-                cur_stopOrderRandom = floor(random() * (cur_stationsQuantity - 2) + 1)::int;
+                cur_stopOrderRandom = floor(random() * (cur_stationsQuantity - 3))::int + 1;
                 -- [1, cur_stationsQuantity - 3]
+
 
                 -- станции не могут совпадать из-за триггера
                 select "stationID", "stopOrder"
@@ -332,7 +386,8 @@ $$
                 insert into "passengersTrips" ("scheduleID", "passengerID", "departureStationID", "arrivalStationID",
                                                "wagonID", "placeNumber")
                 values (cur_scheduleID, cur_passengerID, cur_departureStationID, cur_arrivalStationID, cur_wagonID,
-                        cur_placeNumber);
+                        cur_placeNumber)
+                on conflict do nothing;
 
             end loop;
     end;
