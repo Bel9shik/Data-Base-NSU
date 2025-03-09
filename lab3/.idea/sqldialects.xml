@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SqlDialectMappings">
+    <file url="file://$PROJECT_DIR$/selectRequests/requests.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/tables/createTables.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/tables/fillingTables/fillingEmployees.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/tables/fillingTables/fillingPassenger.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/tables/fillingTables/fillingRouteStations.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/tables/fillingTables/fillingRoutes.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/tables/fillingTables/fillingSchedule.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/tables/fillingTables/fillingTimeSchedule.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/tables/fillingTables/fillingTrains.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/tables/fillingTables/fillingWagons.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/tables/fillingTables/insertTables.sql" dialect="PostgreSQL" />
+    <file url="PROJECT" dialect="PostgreSQL" />
+  </component>
+</project>

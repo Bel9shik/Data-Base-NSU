@@ -1,0 +1,12 @@
+drop table if exists employees cascade;
+drop table if exists "passengersTrips" cascade;
+drop table if exists passengers cascade;
+drop table if exists "routeStations" cascade;
+drop table if exists routes cascade;
+drop table if exists schedule cascade;
+drop table if exists stations cascade;
+drop table if exists "timeSchedule" cascade;
+drop table if exists trains cascade;
+drop table if exists "wagonType" cascade;
+drop table if exists wagons cascade;
+drop table if exists "trainCategories" cascade;
