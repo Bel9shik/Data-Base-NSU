@@ -97,7 +97,7 @@ $$;
 do
 $$
     declare
-        cur_trainID int;
+        cur_trainID        int;
         cur_quantityWagons int;
     begin
         for cur_trainID, cur_quantityWagons in (select id, "quantityWagon" from trains)
@@ -307,13 +307,14 @@ $$
         for i in 1..routes_size
             loop
                 cur_routeID = i;
-                stations_quantity = floor(random() * 15 + 5)::int; --[5,20) станций
+                stations_quantity = floor(random() * 15)::int + 5; --[5,20) станций
                 for j in 1..stations_quantity
                     loop
                         select id from stations order by random() limit 1 into cur_stationID;
                         cur_distance = floor(random() * 45 + 5)::int; -- [5, 50) km
                         insert into "routeStations" ("routeID", "stationID", "stopOrder", distance)
-                        values (cur_routeID, cur_stationID, j, cur_distance);
+                        values (cur_routeID, cur_stationID, j, cur_distance)
+                        on conflict do nothing;
                     end loop;
             end loop;
     end;
@@ -329,14 +330,14 @@ $$
         cur_stationsQuantity          int;
         cur_stopOrderRandom           int;
         cur_departureStationID        int;
-        cur_departureStationStopOrder int;
         cur_arrivalStationID          int;
         cur_trainID                   int;
         cur_wagonID                   int;
         cur_placeNumber               int;
+        cur_departureStopOrder        int;
     begin
 
-        for _ in 1..100000
+        for _ in 1..10000
             loop
                 select id, "routeID", "trainID"
                 from schedule
@@ -348,19 +349,17 @@ $$
 
                 select count(*) from "routeStations" where "routeID" = cur_routeID into cur_stationsQuantity;
 
-                cur_stopOrderRandom = floor(random() * (cur_stationsQuantity - 3))::int + 1;
-                -- [1, cur_stationsQuantity - 3]
+                cur_departureStopOrder = floor(random() * (cur_stationsQuantity - 3))::int + 1; -- [1, cur_stationsQuantity - 3]
 
-
-                -- станции не могут совпадать из-за триггера
-                select "stationID", "stopOrder"
+                select "stationID"
                 from "routeStations"
                 where "routeID" = cur_routeID
-                  and "stopOrder" = cur_stopOrderRandom
-                into cur_departureStationID, cur_departureStationStopOrder;
+                  and "stopOrder" = cur_departureStopOrder
+                into cur_departureStationID;
 
-                cur_stopOrderRandom = floor(random() * (cur_stationsQuantity - cur_stopOrderRandom + 1) +
-                                            cur_stopOrderRandom)::int; -- [cur_stopOrderRandom, cur_stationsQuantity]
+                cur_stopOrderRandom =
+                        floor(random() * (cur_stationsQuantity - cur_departureStopOrder))::int + cur_departureStopOrder +
+                        1; -- [cur_departureStopOrder + 1, cur_stationsQuantity]
 
                 select "stationID"
                 from "routeStations"
@@ -378,7 +377,7 @@ $$
                                                 join schedule sch on sch.id = cur_scheduleID
                                                 join "routeStations" rs on rs."routeID" = cur_routeID and
                                                                            rs."stopOrder" >=
-                                                                           cur_departureStationStopOrder
+                                                                           cur_departureStopOrder
                                            and ps."wagonID" = cur_wagonID) then
                     continue; --если место занято
                 end if;
