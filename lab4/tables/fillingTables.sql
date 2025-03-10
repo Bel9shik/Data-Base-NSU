@@ -408,7 +408,7 @@ $$
         for cur_scheduleID, cur_routeID in (select id, "routeID" from schedule)
             loop
 
-                prev_arrival_time = now() + (random() * interval '7 days'); --стартовое время
+                prev_arrival_time = now() - interval '2 years' + (random() * interval '2 years'); --стартовое время
 
                 for cur_stationID, cur_stopOrder in (select "stationID", "stopOrder"
                                                      from "routeStations" rs
@@ -422,7 +422,7 @@ $$
                             insert into "timeSchedule" ("scheduleID", "stationID", "plannedArrivalTime",
                                                         "realArrivalTime",
                                                         "stopDuration")
-                            values (cur_scheduleID, cur_stationID, prev_arrival_time, prev_arrival_time, cur_stopOrder);
+                            values (cur_scheduleID, cur_stationID, prev_arrival_time, prev_arrival_time, stop_duration);
                         else
                             select interval '1 min' * (rs.distance / avg_speed * 60)
                             from "routeStations" rs
