@@ -101,26 +101,31 @@ declare
 begin
     -- Выбираем поезда, которые задерживаются на указанную дату
     for r in
-        select ts."scheduleID" as schedule_id, ts."realArrivalTime", (ts."realArrivalTime" - ts."plannedArrivalTime") as "delayMinutes"
+        select ts."scheduleID" as schedule_id, ts."stationID" as station_id, ts."realArrivalTime"
         from "timeSchedule" ts
         where ts."realArrivalTime"::date = p_date
-          and ts."realArrivalTime" - ts."plannedArrivalTime" > 0
+          and ts."realArrivalTime" - ts."plannedArrivalTime" != interval '0 minute'
         loop
             -- Обновляем время прибытия и сбрасываем задержку
-            update "timeSchedule"
-            set "realArrivalTime" = r."realArrivalTime" + make_interval(mins => r."delayMinutes")
-            where "scheduleID" = r.schedule_id;
+            update "timeSchedule" ts
+            set "plannedArrivalTime" = ts."realArrivalTime"
+            where "scheduleID" = r.schedule_id and "stationID" = r.station_id;
 
-            raise notice 'Обновлено: % | Новое время: %', r.schedule_id, r."realArrivalTime" + make_interval(mins => r."delayMinutes");
+            raise notice 'Расписание: % | Станция: % | Новое время: %', r.schedule_id, r.station_id, r."realArrivalTime";
         end loop;
 
 exception
     when others then
         raise warning 'Ошибка: %', sqlerrm;
-end;
+end
 $$
     language plpgsql;
 
 select update_delayed_trains('2025-03-18');
 
-select * from "timeSchedule" where "realArrivalTime"::date = '2025-03-17';
+select * from "timeSchedule" where "realArrivalTime"::date = '2025-03-18';
+
+select ts."scheduleID" as schedule_id, ts."stationID" as station_id, ts."realArrivalTime"
+from "timeSchedule" ts
+where ts."realArrivalTime"::date = '2025-03-18'
+  and ts."realArrivalTime" - ts."plannedArrivalTime" != interval '0 minute';

@@ -548,7 +548,7 @@ $$
 
                             insert into "timeSchedule" ("scheduleID", "stationID", "plannedArrivalTime",
                                                         "realArrivalTime", "stopDuration")
-                            values (cur_scheduleID, cur_stationID, prev_plan_arrival_time, prev_plan_arrival_time,
+                            values (cur_scheduleID, cur_stationID, prev_plan_arrival_time, prev_real_arrival_time,
                                     stop_duration);
 
                         end if;

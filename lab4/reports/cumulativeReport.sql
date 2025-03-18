@@ -44,3 +44,4 @@ select
     sum(passengers_kilometers) over (order by date rows between unbounded preceding and current row) as "число пассажиро-километров"
 from daily_trips
 order by date;
+
