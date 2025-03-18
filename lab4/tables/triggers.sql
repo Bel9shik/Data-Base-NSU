@@ -142,7 +142,7 @@ $$
 declare
     prev_time timestamp with time zone;
     travel_interval interval;
-    default_interval interval := '30 minutes';  -- Дефолтный интервал
+    default_interval interval = '30 minutes';  -- Дефолтный интервал
 begin
     -- Получаем время прибытия на предыдущую станцию
     select ts."plannedArrivalTime"
@@ -206,7 +206,7 @@ begin
     if new.id is null then
         -- Ищем минимальный ID, которого нет в routes и schedule
         select min(t.id) into new_id
-        from generate_series(1, 1000000) t(id)
+        from generate_series(1, (select count(*) + 1 from routes)) t(id)
         where not exists (select 1 from routes r where r.id = t.id)
           and not exists (select 1 from schedule s where s."routeID" = t.id)
         limit 1;
