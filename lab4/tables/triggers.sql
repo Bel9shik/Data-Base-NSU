@@ -97,3 +97,5 @@ create trigger trig_check_routes_stations
     for each row
 execute function check_routes_stations();
 
+
+

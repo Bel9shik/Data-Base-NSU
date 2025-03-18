@@ -10,3 +10,4 @@ drop table if exists trains cascade;
 drop table if exists "wagonType" cascade;
 drop table if exists wagons cascade;
 drop table if exists "trainCategories" cascade;
+drop table if exists "brigades" cascade;

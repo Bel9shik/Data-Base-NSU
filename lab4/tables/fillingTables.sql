@@ -8,13 +8,13 @@ values ('Пассажирский'),
 on conflict do nothing;
 
 --5
-insert into "wagonType" (type)
-values ('Общий'),
-       ('Плацкарт'),
-       ('Купе'),
-       ('СВ'),
-       ('Ресторан'),
-       ('Грузовой')
+insert into "wagonType" (type, capacity)
+values ('Общий', 100),
+       ('Плацкарт', 40),
+       ('Купе', 30),
+       ('СВ', 20),
+       ('Ресторан', 60),
+       ('Грузовой', 1000)
 on conflict do nothing;
 
 --1k
@@ -26,17 +26,28 @@ on conflict do nothing;
 do
 $$
     declare
-        departureID int;
-        arrivalID   int;
+        station_ids  int[];
+        num_stations int;
+        departureID  int;
+        arrivalID    int;
     begin
+        -- получаем массив всех id станций
+        select array_agg(id)
+        into station_ids
+        from stations;
+
+        num_stations = array_length(station_ids, 1);
+
         for _ in 1..5000
             loop
-                select id from stations order by random() limit 1 into departureID;
-                select id from stations order by random() limit 1 into arrivalID;
+
+                departureID = station_ids[floor(random() * num_stations)::int + 1];
+                arrivalID = station_ids[floor(random() * num_stations)::int + 1];
+
                 if arrivalID = departureID then
                     continue;
                 end if;
-                insert into routes("departureStation", "arrivalStation")
+                insert into routes("departureStationID", "arrivalStationID")
                 values (departureID,
                         arrivalID)
                 on conflict
@@ -49,66 +60,114 @@ $$;
 do
 $$
     declare
-        cur_categoryID    int;
-        cur_headStationID int;
+        cur_categoryID      int;
+        trainCategory_ids   int[];
+        num_trainCategories int;
     begin
+
+        select array_agg("categoryID")
+        into trainCategory_ids
+        from "trainCategories";
+
+        num_trainCategories = array_length(trainCategory_ids, 1);
 
         for i in 1..1000
             loop
-                select "categoryID"
-                from "trainCategories"
-                order by random()
-                limit 1
-                into cur_categoryID;
 
-                select id
-                from stations
-                order by random()
-                limit 1
-                into cur_headStationID;
+                cur_categoryID = trainCategory_ids[floor(random() * num_trainCategories)::int + 1];
 
-                insert into trains("trainNumber", "categoryID", "headStationID", "quantityWagon")
+                insert into trains("trainNumber", "categoryID", "quantityWagon")
                 values ('Поезд_' || i::varchar,
                         cur_categoryID,
-                        cur_headStationID,
                         floor(random() * 21 + 5)::int -- [5, 20]
                        );
             end loop;
     end;
 $$;
 
+--20k
 do
 $$
+    declare
+        routes_ids int[];
+        num_routes int;
+        trains_ids int[];
+        num_trains int;
     begin
+
+        select array_agg(id)
+        into routes_ids
+        from routes;
+
+        num_routes = array_length(routes_ids, 1);
+
+        select array_agg(id)
+        into trains_ids
+        from trains;
+
+        num_trains = array_length(trains_ids, 1);
+
         for i in 1..20000
             loop
                 insert into schedule ("routeID", "trainID")
-                values ((select id from routes order by random() limit 1),
-                        (select id from trains order by random() limit 1))
+                values ((routes_ids[floor(random() * num_routes)::int + 1]),
+                        (trains_ids[floor(random() * num_trains)::int + 1]))
                 on conflict do nothing;
             end loop;
     end;
 $$;
 
---20k
-
-
 --trains_quantity * trains_wagons_quantity
 do
 $$
     declare
-        cur_trainID        int;
-        cur_quantityWagons int;
+        cur_trainID         int;
+        cur_trainCategoryID int;
+        cur_quantityWagons  int;
+        cargoTrainTypeID    int;
+        cargoWagonTypeID    int;
     begin
-        for cur_trainID, cur_quantityWagons in (select id, "quantityWagon" from trains)
+
+        select "categoryID" from "trainCategories" where "categoryName" = 'Грузовой' into cargoTrainTypeID;
+        select "id" from "wagonType" where "type" = 'Грузовой' into cargoWagonTypeID;
+
+        for cur_trainID, cur_quantityWagons, cur_trainCategoryID in (select id, "quantityWagon", "categoryID" from trains)
             loop
+
                 for _ in 1..cur_quantityWagons
                     loop
-                        insert into wagons ("trainID", capacity, "wagonTypeID")
-                        values (cur_trainID,
-                                floor(random() * 50 + 1)::int, -- [1, 50]
-                                (select id from "wagonType" order by random() limit 1));
+                        if cur_trainCategoryID = cargoTrainTypeID then
+                            insert into wagons ("trainID", "wagonTypeID")
+                            values (cur_trainID,
+                                    cargoWagonTypeID);
+                        else
+                            insert into wagons ("trainID", "wagonTypeID")
+                            values (cur_trainID,
+                                    (select id
+                                     from "wagonType"
+                                     where id != cargoWagonTypeID
+                                     order by random()
+                                     limit 1));
+                        end if;
+
                     end loop;
+            end loop;
+    end;
+$$;
+
+-- schedule size
+do
+$$
+    declare
+        cur_trainID       int;
+        cur_scheduleID    int;
+        cur_headStationID int;
+    begin
+        for cur_scheduleID, cur_trainID, cur_headStationID in (select distinct sch.id, sch."trainID", r."departureStationID"
+                                                               from schedule sch
+                                                                        join routes r on sch."routeID" = r.id)
+            loop
+                insert into brigades ("trainID", "headStationID") values (cur_trainID, cur_headStationID);
             end loop;
     end;
 $$;
@@ -220,6 +279,7 @@ $$
         cur_train         record;
         employee_count    int;
         cur_employee_id   int;
+        cur_headStationID int;
 
     begin
 
@@ -247,18 +307,18 @@ $$
                 -- Генерируем случайное количество сотрудников для станции
                 employee_count := floor(random() * 21 + 5)::int; --[5; 25]
 
-                for i in 1..employee_count
+                for _ in 1..employee_count
                     loop
                         -- Выбираем случайные ФИО
-                        insert into employees (firstname, surname, patronymic, position, "managerID", "brigadeID",
-                                               "stationID")
+                        insert into employees (firstname, surname, patronymic, position, "managerID", "stationID",
+                                               "brigadeID")
                         values (name[1 + floor(random() * array_length(name, 1))],
                                 surname[1 + floor(random() * array_length(surname, 1))],
                                 patronymics[1 + floor(random() * array_length(patronymics, 1))],
                                 positions[1 + floor(random() * array_length(positions, 1))],
                                 null, -- Пока что начальников не назначаем
-                                null, -- Бригады тоже пока не назначаем
-                                cur_station.id);
+                                cur_station.id,
+                                null); -- Бригады тоже пока не назначаем
                     end loop;
             end loop;
 
@@ -272,11 +332,12 @@ $$
         where position = 'Менеджер';
 
         -- Теперь назначаем сотрудников в поездные бригады
-        for cur_train in (select id, "headStationID" from trains)
+        for cur_train in (select id from trains)
             loop
+                select "headStationID" from brigades where "trainID" = cur_train.id into cur_headStationID;
 
                 -- Назначаем бригаду только сотрудникам станции формирования поезда
-                for cur_employee_id in (select id from employees where "stationID" = cur_train."headStationID")
+                for cur_employee_id in (select id from employees where "stationID" = cur_headStationID)
                     loop
                         -- Выбираем случайную должность для бригады
                         if random() < 0.5 then -- 50% шанс попадания в бригаду
@@ -296,26 +357,50 @@ $$;
 do
 $$
     declare
-        routes_size       int;
+        stations_ids      int[];
+        num_stations_ids  int;
+        --===================
         stations_quantity int;
         cur_stationID     int;
+        cur_arrStationID  int;
+        cur_depStationID  int;
         cur_routeID       int;
         cur_distance      int;
     begin
-        select count(*) from routes into routes_size;
+        select array_agg(id) from stations into stations_ids;
+        num_stations_ids = array_length(stations_ids, 1);
 
-        for i in 1..routes_size
+        for cur_routeID in (select id from routes)
             loop
-                cur_routeID = i;
                 stations_quantity = floor(random() * 15)::int + 5; --[5,20) станций
-                for j in 1..stations_quantity
+                select "departureStationID", "arrivalStationID"
+                from routes
+                where id = cur_routeID
+                into cur_depStationID, cur_arrStationID;
+
+                insert into "routeStations" ("routeID", "stationID", "stopOrder", distance)
+                values (cur_routeID, cur_depStationID, 0, 0);
+                for j in 1..(stations_quantity - 1)
                     loop
-                        select id from stations order by random() limit 1 into cur_stationID;
-                        cur_distance = floor(random() * 45 + 5)::int; -- [5, 50) km
-                        insert into "routeStations" ("routeID", "stationID", "stopOrder", distance)
-                        values (cur_routeID, cur_stationID, j, cur_distance)
-                        on conflict do nothing;
+                        <<retry_insertion>>
+                        loop
+                            cur_stationID = stations_ids[floor(random() * num_stations_ids)::int + 1];
+                            if cur_stationID = cur_arrStationID or cur_stationID = cur_depStationID then
+                                continue retry_insertion;
+                            end if;
+                            cur_distance = floor(random() * 45 + 5)::int; -- [5, 50) km
+                            begin
+                                insert into "routeStations" ("routeID", "stationID", "stopOrder", distance)
+                                values (cur_routeID, cur_stationID, j, cur_distance);
+                                exit retry_insertion;
+                            exception
+                                when unique_violation then null;
+                            end;
+                        end loop retry_insertion;
                     end loop;
+                cur_distance = floor(random() * 45 + 5)::int; -- [5, 50) km
+                insert into "routeStations" ("routeID", "stationID", "stopOrder", distance)
+                values (cur_routeID, cur_arrStationID, stations_quantity, cur_distance);
             end loop;
     end;
 $$;
@@ -324,32 +409,51 @@ $$;
 do
 $$
     declare
-        cur_routeID                   int;
-        cur_scheduleID                int;
-        cur_passengerID               int;
-        cur_stationsQuantity          int;
-        cur_stopOrderRandom           int;
-        cur_departureStationID        int;
-        cur_arrivalStationID          int;
-        cur_trainID                   int;
-        cur_wagonID                   int;
-        cur_placeNumber               int;
-        cur_departureStopOrder        int;
+        schedule_ids           int[];
+        passengers_ids         int[];
+        num_schedule_ids       int;
+        num_passengers_ids     int;
+        cargoTrainCategoryID   int;
+        -- ============================
+        cur_routeID            int;
+        cur_scheduleID         int;
+        cur_passengerID        int;
+        cur_stationsQuantity   int;
+        cur_departureStationID int;
+        cur_arrivalStationID   int;
+        cur_trainID            int;
+        cur_wagonID            int;
+        cur_placeNumber        int;
+        cur_departureStopOrder int;
+        cur_capacity           int;
     begin
 
-        for _ in 1..10000
-            loop
-                select id, "routeID", "trainID"
-                from schedule
-                order by random()
-                limit 1
-                into cur_scheduleID, cur_routeID, cur_trainID;
+        select array_agg(id)
+        into schedule_ids
+        from schedule;
 
-                select id from passengers order by random() limit 1 into cur_passengerID;
+        num_schedule_ids = array_length(schedule_ids, 1);
+
+        select array_agg(id)
+        into passengers_ids
+        from passengers;
+
+        num_passengers_ids = array_length(passengers_ids, 1);
+
+        select "categoryID" from "trainCategories" where "categoryName" = 'Грузовой' into cargoTrainCategoryID;
+
+        for _ in 1..100000
+            loop
+
+                cur_scheduleID = schedule_ids[floor(random() * num_schedule_ids)::int + 1];
+                cur_passengerID = passengers_ids[floor(random() * num_passengers_ids)::int + 1];
+
+                select "routeID", "trainID" from schedule where id = cur_scheduleID into cur_routeID, cur_trainID;
 
                 select count(*) from "routeStations" where "routeID" = cur_routeID into cur_stationsQuantity;
 
-                cur_departureStopOrder = floor(random() * (cur_stationsQuantity - 3))::int + 1; -- [1, cur_stationsQuantity - 3]
+                cur_departureStopOrder =
+                        floor(random() * (cur_stationsQuantity - 3))::int + 1; -- [1, cur_stationsQuantity - 3]
 
                 select "stationID"
                 from "routeStations"
@@ -357,20 +461,23 @@ $$
                   and "stopOrder" = cur_departureStopOrder
                 into cur_departureStationID;
 
-                cur_stopOrderRandom =
-                        floor(random() * (cur_stationsQuantity - cur_departureStopOrder))::int + cur_departureStopOrder +
-                        1; -- [cur_departureStopOrder + 1, cur_stationsQuantity]
-
                 select "stationID"
                 from "routeStations"
                 where "routeID" = cur_routeID
-                  and "stopOrder" = cur_stopOrderRandom
+                  and "stopOrder" > cur_departureStopOrder
+                order by random()
+                limit 1
                 into cur_arrivalStationID;
 
-                select id from wagons w where "trainID" = cur_trainID order by random() limit 1 into cur_wagonID;
+                select w.id, wT.capacity
+                from wagons w
+                         join "wagonType" wT on w."wagonTypeID" = wT.id
+                where "trainID" = cur_trainID
+                order by random()
+                limit 1
+                into cur_wagonID, cur_capacity;
 
-                cur_placeNumber =
-                        floor(random() * (select capacity from wagons where id = cur_wagonID) + 1)::int; -- [1, capacity]
+                cur_placeNumber = floor(random() * cur_capacity + 1)::int; -- [1, capacity]
 
                 if cur_placeNumber in (select "placeNumber"
                                        from "passengersTrips" ps
@@ -396,19 +503,20 @@ $$;
 do
 $$
     declare
-        cur_scheduleID    INT;
-        cur_routeID       INT;
-        cur_stationID     INT;
-        cur_stopOrder     INT;
-        prev_arrival_time TIMESTAMP;
-        travel_time       INTERVAL;
-        stop_duration     INTERVAL;
-        avg_speed         INT := 60; -- Средняя скорость поезда (км/ч)
+        cur_scheduleID         int;
+        cur_routeID            int;
+        cur_stationID          int;
+        cur_stopOrder          int;
+        prev_real_arrival_time timestamp;
+        prev_plan_arrival_time timestamp;
+        travel_time            interval;
+        stop_duration          interval;
+        avg_speed              int := 25; -- Средняя скорость поезда (км/ч)
     begin
         for cur_scheduleID, cur_routeID in (select id, "routeID" from schedule)
             loop
 
-                prev_arrival_time = now() - interval '2 years' + (random() * interval '2 years'); --стартовое время
+                prev_plan_arrival_time = now() - interval '2 years' + (random() * interval '2 years'); --стартовое время
 
                 for cur_stationID, cur_stopOrder in (select "stationID", "stopOrder"
                                                      from "routeStations" rs
@@ -422,7 +530,8 @@ $$
                             insert into "timeSchedule" ("scheduleID", "stationID", "plannedArrivalTime",
                                                         "realArrivalTime",
                                                         "stopDuration")
-                            values (cur_scheduleID, cur_stationID, prev_arrival_time, prev_arrival_time, stop_duration);
+                            values (cur_scheduleID, cur_stationID, prev_plan_arrival_time, prev_plan_arrival_time,
+                                    stop_duration);
                         else
                             select interval '1 min' * (rs.distance / avg_speed * 60)
                             from "routeStations" rs
@@ -430,16 +539,21 @@ $$
                               and "stationID" = cur_stationID
                             into travel_time;
 
-                            prev_arrival_time = prev_arrival_time + travel_time;
+                            prev_plan_arrival_time = prev_plan_arrival_time + travel_time;
+
+                            if random() > 0.5 then
+                                prev_real_arrival_time = prev_plan_arrival_time + (random() * interval '15 minutes') + '1 minute'; -- [1; 15] minutes
+                                else prev_real_arrival_time = prev_plan_arrival_time;
+                            end if;
 
                             insert into "timeSchedule" ("scheduleID", "stationID", "plannedArrivalTime",
                                                         "realArrivalTime", "stopDuration")
-                            values (cur_scheduleID, cur_stationID, prev_arrival_time, prev_arrival_time,
+                            values (cur_scheduleID, cur_stationID, prev_plan_arrival_time, prev_plan_arrival_time,
                                     stop_duration);
 
                         end if;
 
-                        prev_arrival_time = prev_arrival_time + stop_duration;
+                        prev_plan_arrival_time = prev_plan_arrival_time + stop_duration;
 
                     end loop;
             end loop;
