@@ -190,13 +190,12 @@ begin
     -- если новое время меньше или равно времени предыдущей станции, корректируем его
     if new."plannedArrivalTime" <= prev_time then
         -- пытаемся найти интервал между этими двумя станциями у других расписаний
-        select (ts2."plannedArrivalTime" - ts1."plannedArrivalTime")
+        select avg(ts2."plannedArrivalTime" - ts1."plannedArrivalTime")
         into default_interval
         from schedule sch
                  join "timeSchedule" ts1 on ts1."scheduleID" = sch.id and ts1."stationID" = prev_station
                  join "timeSchedule" ts2 on ts2."scheduleID" = sch.id and ts2."stationID" = new."stationID"
-        where sch."routeID" = cur_route_id
-        limit 1;
+        where sch."routeID" = cur_route_id;
 
         new."plannedArrivalTime" = prev_time + default_interval;
     end if;
@@ -225,9 +224,9 @@ begin
         -- Ищем минимальный ID, которого нет в routes и schedule
         select min(t.id)
         into new_id
-        from generate_series(1, (select count(*) + 1 from routes)) t(id)
+        from generate_series(1, max((select count(*) + 1 from routes), (select count(*) + 1 from schedule))) t(id)
         where not exists (select 1 from routes r where r.id = t.id)
-          and not exists (select 1 from schedule s where s."routeID" = t.id)
+          and not exists (select 1 from schedule s where s."id" = t.id)
         limit 1;
 
         new.id := new_id;

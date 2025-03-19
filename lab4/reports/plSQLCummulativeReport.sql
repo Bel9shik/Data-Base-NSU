@@ -121,11 +121,11 @@ end
 $$
     language plpgsql;
 
-select update_delayed_trains('2025-03-18');
+select update_delayed_trains('2025-03-17');
 
-select * from "timeSchedule" where "realArrivalTime"::date = '2025-03-18';
+select * from "timeSchedule" where "realArrivalTime"::date = '2025-03-17';
 
 select ts."scheduleID" as schedule_id, ts."stationID" as station_id, ts."realArrivalTime"
 from "timeSchedule" ts
-where ts."realArrivalTime"::date = '2025-03-18'
+where ts."realArrivalTime"::date = '2025-03-17'
   and ts."realArrivalTime" - ts."plannedArrivalTime" != interval '0 minute';
