@@ -101,7 +101,7 @@ execute function check_routes_stations();
 
 -- триггер, проверяющий, корректные ли данные вносятся в timetable в части соответствия поезда и станции назначенному на данный поезд маршруту.
 
-create or replace function check_timetable_validity()
+create or replace function check_timeschedule_validity()
     returns trigger as
 $$
 declare
@@ -128,7 +128,7 @@ create trigger validate_timetable
     before insert or update
     on "timeSchedule"
     for each row
-execute function check_timetable_validity();
+execute function check_timeschedule_validity();
 
 
 -- триггер, проверяющий, верно ли в таблице расписаний стоит время при внесении новых данных (новой строки): оно должно быть больше времени,
@@ -136,63 +136,81 @@ execute function check_timetable_validity();
 -- автоматически сделать текущее время больше предыдущего на заданный интервал. Интервал ищется триггером автоматически путём поиска
 -- онного у других поездов, передвигающихся между этими же двумя точками. Если таковых нет, интервал берётся дефолтный (константа).
 
-create or replace function adjust_schedule_time()
+create or replace function update_timeschedule_planned()
     returns trigger as
 $$
 declare
-    prev_time timestamp with time zone;
-    travel_interval interval;
-    default_interval interval = '30 minutes';  -- Дефолтный интервал
+    cur_route_id     int;
+    cur_stop_order   int;
+    prev_station     int;
+    prev_time        timestamp with time zone;
+    default_interval interval = '10 min';
 begin
-    -- Получаем время прибытия на предыдущую станцию
-    select ts."plannedArrivalTime"
+    select "routeID"
+    into cur_route_id
+    from schedule
+    where id = new."scheduleID";
+
+    select "stopOrder"
+    into cur_stop_order
+    from "routeStations"
+    where "routeID" = cur_route_id
+      and "stationID" = new."stationID";
+
+    if cur_stop_order is null then
+        return null;
+    end if;
+
+    if cur_stop_order = 0 then
+        return new;
+    end if;
+
+    -- получаем предыдущую станцию по маршруту
+    select "stationID"
+    into prev_station
+    from "routeStations"
+    where "routeID" = cur_route_id
+      and "stopOrder" = cur_stop_order - 1;
+
+    if prev_station is null then
+        return null;
+    end if;
+
+    -- получаем planned arrival time предыдущей станции для данного расписания
+    select "plannedArrivalTime"
     into prev_time
-    from "timeSchedule" ts
-             join "routeStations" rs on ts."stationID" = rs."stationID"
-    where ts."scheduleID" = new."scheduleID"
-      and rs."routeID" = (select "routeID" from schedule where id = new."scheduleID")
-      and rs."stopOrder" = (select rs2."stopOrder" - 1
-                            from "routeStations" rs2
-                            where rs2."stationID" = new."stationID"
-                              and rs2."routeID" = (select "routeID" from schedule where id = new."scheduleID"))
-    order by ts."plannedArrivalTime" desc
-    limit 1;
+    from "timeSchedule"
+    where "scheduleID" = new."scheduleID"
+      and "stationID" = prev_station;
 
-    -- Если предыдущая станция есть
-    if prev_time is not null then
-        -- Ищем интервал между станциями по другим поездам
-        select avg(ts2."plannedArrivalTime" - ts1."plannedArrivalTime")
-        into travel_interval
-        from "timeSchedule" ts1
-                 join "timeSchedule" ts2 on ts1."scheduleID" = ts2."scheduleID"
-        where ts1."stationID" = (select rs2."stationID"
-                                 from "routeStations" rs2
-                                 where rs2."routeID" = (select "routeID" from schedule where id = new."scheduleID")
-                                   and rs2."stopOrder" = (select rs3."stopOrder" - 1
-                                                          from "routeStations" rs3
-                                                          where rs3."stationID" = new."stationID"))
-          and ts2."stationID" = new."stationID";
+    if prev_time is null then
+        return new;
+    end if;
 
-        -- Если интервал не найден, берём дефолтный
-        if travel_interval is null then
-            travel_interval := default_interval;
-        end if;
+    -- если новое время меньше или равно времени предыдущей станции, корректируем его
+    if new."plannedArrivalTime" <= prev_time then
+        -- пытаемся найти интервал между этими двумя станциями у других расписаний
+        select (ts2."plannedArrivalTime" - ts1."plannedArrivalTime")
+        into default_interval
+        from schedule sch
+                 join "timeSchedule" ts1 on ts1."scheduleID" = sch.id and ts1."stationID" = prev_station
+                 join "timeSchedule" ts2 on ts2."scheduleID" = sch.id and ts2."stationID" = new."stationID"
+        where sch."routeID" = cur_route_id
+        limit 1;
 
-        -- Проверяем время и исправляем, если необходимо
-        if new."plannedArrivalTime" <= prev_time then
-            new."plannedArrivalTime" := prev_time + travel_interval;
-        end if;
+        new."plannedArrivalTime" = prev_time + default_interval;
     end if;
 
     return new;
 end;
-$$ language plpgsql;
+$$
+    language plpgsql;
 
-create trigger enforce_schedule_order
-    before insert or update on "timeSchedule"
+create trigger trg_update_timeschedule
+    before insert or update
+    on "timeSchedule"
     for each row
-execute function adjust_schedule_time();
-
+execute function update_timeschedule_planned();
 
 -- триггер для таблицы маршрутов, который автоматически ставит номер маршрута, если он не заполнен при вставке данных.
 -- Номер ставится по следующему правилу: минимальное число, которого нет ни в таблице маршрутов, ни в таблице расписания.
@@ -205,7 +223,8 @@ declare
 begin
     if new.id is null then
         -- Ищем минимальный ID, которого нет в routes и schedule
-        select min(t.id) into new_id
+        select min(t.id)
+        into new_id
         from generate_series(1, (select count(*) + 1 from routes)) t(id)
         where not exists (select 1 from routes r where r.id = t.id)
           and not exists (select 1 from schedule s where s."routeID" = t.id)
@@ -219,7 +238,8 @@ end;
 $$ language plpgsql;
 
 create trigger auto_route_id
-    before insert on routes
+    before insert
+    on routes
     for each row
 execute function auto_assign_route_id();
 
@@ -232,7 +252,7 @@ create or replace function log_deleted_trains()
 $$
 declare
     ticket_count int;
-    train_num varchar(20);
+    train_num    varchar(20);
 begin
     -- Считаем количество проданных билетов на этот поезд
     select count(*)
@@ -253,7 +273,8 @@ end;
 $$ language plpgsql;
 
 create trigger log_train_deletions
-    before delete on trains
+    before delete
+    on trains
     for each row
 execute function log_deleted_trains();
 
