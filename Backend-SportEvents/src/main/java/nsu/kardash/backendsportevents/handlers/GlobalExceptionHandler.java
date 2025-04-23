@@ -6,6 +6,7 @@ import nsu.kardash.backendsportevents.dto.responses.errors.PersonErrorResponse;
 import nsu.kardash.backendsportevents.dto.responses.errors.ValidationErrorResponse;
 import nsu.kardash.backendsportevents.exceptions.Event.EventNotFoundException;
 import nsu.kardash.backendsportevents.exceptions.Person.*;
+import nsu.kardash.backendsportevents.exceptions.Role.RoleNotFoundException;
 import nsu.kardash.backendsportevents.exceptions.ValidationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authorization.AuthorizationDeniedException;
@@ -28,12 +29,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PersonNotFoundException.class)
     public ResponseEntity<PersonErrorResponse> handle(PersonNotFoundException e) {
         System.out.println("test exception");
-        return ResponseEntity.badRequest().body(new PersonErrorResponse(Map.of("error", e.getMessage()), System.currentTimeMillis()));
+        return ResponseEntity
+                .badRequest()
+                .body(new PersonErrorResponse(Map.of("error", e.getMessage()), System.currentTimeMillis()));
     }
 
     @ExceptionHandler(RefreshTokenNotFound.class)
     public ResponseEntity<PersonErrorResponse> handle(RefreshTokenNotFound e) {
-        return ResponseEntity.badRequest().body(new PersonErrorResponse(Map.of("error", e.getMessage()), System.currentTimeMillis()));
+        return ResponseEntity
+                .badRequest()
+                .body(new PersonErrorResponse(Map.of("error", e.getMessage()), System.currentTimeMillis()));
     }
 
     @ExceptionHandler(SignatureVerificationException.class)
@@ -83,6 +88,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .badRequest()
                 .body(new EventErrorResponse(e.getMessage(), System.currentTimeMillis()));
+    }
+
+    @ExceptionHandler (RoleNotFoundException.class)
+    private ResponseEntity<EventErrorResponse> handleException(RoleNotFoundException e) {
+        return ResponseEntity
+                .internalServerError()
+                .build();
     }
 
 }

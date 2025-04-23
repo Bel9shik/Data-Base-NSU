@@ -1,8 +1,8 @@
 package nsu.kardash.backendsportevents.config;
 
 import lombok.RequiredArgsConstructor;
-import nsu.kardash.backendsportevents.handlers.JWTAuthenticationEntryPoint;
 import nsu.kardash.backendsportevents.handlers.CustomAccessDeniedHandler;
+import nsu.kardash.backendsportevents.handlers.JWTAuthenticationEntryPoint;
 import nsu.kardash.backendsportevents.services.PersonDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -36,10 +36,11 @@ public class SecurityConfig {
         http
                 // Разрешаем доступ к странице логина, разлогирования и регистрации всем
                 .authorizeHttpRequests(authorize -> authorize
-                                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                                .requestMatchers("/api/v1/auth/**", "/events/**").permitAll()
-                                .requestMatchers("/api/v1/admin").hasRole("ADMIN")
-                                .anyRequest().authenticated()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/api/v1/auth/**", "/events/**").permitAll()
+                        .requestMatchers("/api/v1/info").hasRole("USER")
+                        .requestMatchers("/api/v1/admin").hasRole("ADMIN")
+                        .anyRequest().authenticated()
                 )
                 .exceptionHandling(exceptionHandling -> {
                     exceptionHandling.authenticationEntryPoint(jwtAuthenticationEntryPoint);

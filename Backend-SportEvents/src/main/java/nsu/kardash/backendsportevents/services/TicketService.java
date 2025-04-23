@@ -18,4 +18,8 @@ public class TicketService {
         return ticketRepository.findTicketsByEvent(event);
     }
 
+    public long countTicketsByEventAndStatusNot(Event event, String status) {
+        return ticketRepository.countByEventAndStatusNot(event, status);
+    }
+
 }

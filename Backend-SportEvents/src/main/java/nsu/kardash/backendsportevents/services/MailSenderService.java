@@ -7,6 +7,9 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
+
 @Service
 @RequiredArgsConstructor
 public class MailSenderService implements EmailPublisher {
@@ -17,7 +20,7 @@ public class MailSenderService implements EmailPublisher {
     private final SimpleMailMessage mailMessage;
 
     @Override
-    public void sendEmail(String toEmail, int verifyCode) {
+    public void sendNotifyEmail(String toEmail, int verifyCode) {
 
         mailMessage.setTo(toEmail);
         mailMessage.setSubject("PetHost confirm registration");
@@ -29,7 +32,25 @@ public class MailSenderService implements EmailPublisher {
     }
 
     @Override
-    public void sendEmail(String toEmail, String subject, String body) {
+    public void sendNotifyEmail(String toEmail, String personFirstName, String eventName, OffsetDateTime eventStartedAt) {
+
+        String body    = String.format(
+                "Здравствуйте, %s!\n\n" +
+                        "Через %d минут начнётся Ваше мероприятие \"%s\".\n" +
+                        "Ждём Вас на площадке!",
+                personFirstName,
+                ChronoUnit.MINUTES.between(OffsetDateTime.now(), eventStartedAt),
+                eventName
+        );
+
+        System.out.println("Сообщение отправлено " + toEmail + ": \n" + body);
+
+        mailMessage.setTo(toEmail);
+        mailMessage.setSubject("Скоро начнётся мероприятие");
+        mailMessage.setText(body);
+        mailMessage.setFrom(from);
+
+        mailSender.send(mailMessage);
 
     }
 

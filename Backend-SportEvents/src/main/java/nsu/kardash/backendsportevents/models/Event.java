@@ -29,6 +29,9 @@ public class Event {
     @NotNull
     private int seatCount;
 
+    @NotNull
+    private String name;
+
     @ManyToOne
     @JoinColumn(name = "venueid", nullable = false)
     private SportsVenue venue;
@@ -38,4 +41,3 @@ public class Event {
     private Trainer trainer;
 
 }
-
