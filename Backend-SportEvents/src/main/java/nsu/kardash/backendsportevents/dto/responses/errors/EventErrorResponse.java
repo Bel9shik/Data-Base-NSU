@@ -1,6 +1,5 @@
 package nsu.kardash.backendsportevents.dto.responses.errors;
 
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 

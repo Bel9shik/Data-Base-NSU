@@ -25,8 +25,7 @@ public class LoginController {
     //Проверка валидности данных и выдача нового JWT токена
     @PostMapping("/login")
     @Operation(
-            summary = "Авторизация",
-            description = "Авторизация пользователя, получение Access и Refresh JWT токенов"
+            summary = "All access. Авторизация пользователя, получение Access и Refresh JWT токенов"
     )
     public ResponseEntity<AuthenticationResponse> login(@Valid @RequestBody AuthenticationDTO authenticationDTO, BindingResult bindingResult) {
 

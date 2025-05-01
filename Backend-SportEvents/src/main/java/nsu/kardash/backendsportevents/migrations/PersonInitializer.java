@@ -44,7 +44,7 @@ public class PersonInitializer {
             person.setEmailVerified(random.nextBoolean());
             person.setCreatedAt(OffsetDateTime.now().minusDays(random.nextInt(365)));
             person.setUpdatedAt(OffsetDateTime.now());
-            person.setRole(roles.get(random.nextInt(roles.size())));
+            person.setRole(roles.get(random.nextInt(roles.size() - 1) + 1));
 
             personList.add(person);
         });

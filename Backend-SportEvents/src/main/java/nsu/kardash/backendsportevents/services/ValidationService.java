@@ -7,7 +7,6 @@ import org.springframework.validation.BindingResult;
 import java.util.HashMap;
 import java.util.Map;
 
-@Service
 public class ValidationService {
 
     public static void checkValidationErrors(BindingResult bindingResult) {

@@ -11,8 +11,11 @@ spring.datasource.password=some_password
 # Hibernate
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 spring.jpa.properties.hibernate.show_sql=true
-# create | update | validate | create-drop
 spring.jpa.hibernate.ddl-auto=update
+# create | update | validate | create-drop
+spring.jpa.properties.hibernate.jdbc.batch_size=200
+spring.jpa.properties.hibernate.order_inserts=true
+spring.jpa.properties.hibernate.order_updates=true
 
 # HTTP Methods: PUT, PATCH, DELETE
 spring.mvc.hiddenmethod.filter.enabled=true
@@ -29,8 +32,13 @@ spring.mail.port=587
 spring.mail.properties.mail.smtp.auth=true
 spring.mail.properties.mail.smtp.starttls.enable=true
 
+# MAIL SCHEDULER
+app.notification.fixedRate.millis = 300000
+app.notification.threshold.minutes = 120
+
 # Redis
 spring.data.redis.host=${SPRING_REDIS_HOST:localhost}
 spring.data.redis.port=6379
+spring.cache.type=redis
 
 

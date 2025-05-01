@@ -20,12 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/auth/")
 @RequiredArgsConstructor
-@Schema(description = "Регистрация пользователя")
 public class RegistrationController {
 
     private final RegistrationService registrationService;
 
-    @Operation(summary = "Регистрация пользователя",
+    @Operation(summary = "All access. Регистрация пользователя",
             description = "Позволяет зарегистрировать пользователя, записывает его в БД")
     @PostMapping("/registration")
     public ResponseEntity<RegistrationResponse> registration(@RequestBody @Valid RegistrationDTO registrationDTO, BindingResult bindingResult) {
@@ -36,7 +35,7 @@ public class RegistrationController {
 
     }
 
-    @Operation(summary = "Подтверждение почты",
+    @Operation(summary = "All access. Подтверждение почты",
             description = "Для подтверждения почты отправляется письмо на указанный адрес")
     @PostMapping("/confirmEmail")
     public ResponseEntity<RegistrationResponse> confirmEmail(@RequestBody ConfirmEmailDTO confirmEmailDTO, BindingResult bindingResult) {
@@ -46,7 +45,7 @@ public class RegistrationController {
                 .body(registrationService.confirmEmail(confirmEmailDTO.getEmail(), bindingResult));
     }
 
-    @Operation(summary = "Подтверждение кода регистрации",
+    @Operation(summary = "All access. Подтверждение кода регистрации",
             description = "У пользователя 5 минут с момента отправки сообщения, если он вводит верный код в указанный промежуток времени, то его почта становится подтверждённой")
     @PostMapping("/confirmCode")
     public ResponseEntity<RegistrationResponse> confirmCode(@RequestBody @Valid VerifyAccountDTO verifyAccountDTO, BindingResult bindingResult) {

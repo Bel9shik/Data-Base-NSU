@@ -37,10 +37,10 @@ public class SecurityConfig {
                 // Разрешаем доступ к странице логина, разлогирования и регистрации всем
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                        .requestMatchers("/api/v1/auth/**", "/events/**").permitAll()
-                        .requestMatchers("/api/v1/info").hasRole("USER")
+                        .requestMatchers("/api/v1/auth/**", "/api/v1/events/shortEventInfo", "/api/v1/events/fullEventInfo", "/api/v1/people/resetPassword").permitAll()
                         .requestMatchers("/api/v1/admin").hasRole("ADMIN")
                         .anyRequest().authenticated()
+//                        .anyRequest().permitAll()
                 )
                 .exceptionHandling(exceptionHandling -> {
                     exceptionHandling.authenticationEntryPoint(jwtAuthenticationEntryPoint);

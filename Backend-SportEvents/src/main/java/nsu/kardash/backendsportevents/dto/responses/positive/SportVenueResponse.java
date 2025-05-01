@@ -1,23 +1,16 @@
 package nsu.kardash.backendsportevents.dto.responses.positive;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import nsu.kardash.backendsportevents.models.SportsVenue;
 
+import java.util.List;
 import java.util.Map;
 
 @Data
+@AllArgsConstructor
 public class SportVenueResponse {
 
-    Map<Integer, Map<String, Object>> venues;
-//    Map<String, Object> venues;
-
-    public SportVenueResponse(SportsVenue venue) {
-
-    }
-
-    public SportVenueResponse(Map<Integer, Map<String, Object>> venues) {
-
-        this.venues = venues;
-    }
+    List<SportsVenue> venues;
 
 }

@@ -23,8 +23,9 @@ public class RefreshController {
     private final RefreshService refreshService;
 
     @PostMapping("/refresh")
-    @Operation( summary = "Обновление Refresh JWT токена",
-            description = "Позволяет обновить JWT токен на новый токен, действующий неделю")
+    @Operation(
+            summary = "All access. Позволяет обновить JWT токен на новый токен, действующий неделю"
+    )
     public ResponseEntity<AuthenticationResponse> refresh(@Valid @RequestBody RefreshDTO refreshDTO, BindingResult bindingResult) {
 
         return ResponseEntity

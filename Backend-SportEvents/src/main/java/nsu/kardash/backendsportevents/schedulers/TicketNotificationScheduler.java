@@ -28,7 +28,7 @@ public class TicketNotificationScheduler {
         OffsetDateTime now = OffsetDateTime.now();
         OffsetDateTime deadline = now.plus(thresholdMinutes, ChronoUnit.MINUTES);
         List<Ticket> toNotify = ticketRepository.findTicketsByStatusAndEvent_StartedAtBetween(
-                Constants.confirmed, now, deadline
+                Constants.STATUS_CONFIRMED, now, deadline
         );
 
         toNotify.forEach(this::sendReminder);

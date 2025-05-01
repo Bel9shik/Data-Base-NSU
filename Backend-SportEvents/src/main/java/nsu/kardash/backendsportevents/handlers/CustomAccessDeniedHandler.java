@@ -19,7 +19,6 @@ public class CustomAccessDeniedHandler implements AccessDeniedHandler {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.getWriter().write("""
                 {
-                  "error": "Forbidden",
                   "message": "%s"
                 }
                 """.formatted(accessDeniedException.getMessage()));

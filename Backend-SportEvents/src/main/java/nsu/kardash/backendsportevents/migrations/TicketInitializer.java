@@ -64,7 +64,7 @@ public class TicketInitializer {
 
             buffer.add(t);
 
-            if (!status.equals(Constants.cancelled)) usedSeats.put(evId, usedSeats.get(evId) + 1);
+            if (!status.equals(Constants.STATUS_CANCELLED)) usedSeats.put(evId, usedSeats.get(evId) + 1);
 
             if (buffer.size() >= 200) {
                 ticketRepository.saveAll(buffer);
@@ -83,9 +83,9 @@ public class TicketInitializer {
 
     private String randomStatus() {
         return switch (rnd.nextInt(3)) {
-            case 0 -> Constants.pending;
-            case 1 -> Constants.confirmed;
-            default -> Constants.cancelled;
+            case 0 -> Constants.STATUS_PENDING;
+            case 1 -> Constants.STATUS_CONFIRMED;
+            default -> Constants.STATUS_CANCELLED;
         };
     }
 }

@@ -3,21 +3,35 @@ package nsu.kardash.backendsportevents.services;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import nsu.kardash.backendsportevents.dto.requests.RegistrationDTO;
+import nsu.kardash.backendsportevents.dto.requests.UpdatePersonDTO;
 import nsu.kardash.backendsportevents.dto.responses.positive.CabinetResponse;
+import nsu.kardash.backendsportevents.dto.responses.positive.OkResponse;
+import nsu.kardash.backendsportevents.dto.responses.positive.PersonResponse;
 import nsu.kardash.backendsportevents.exceptions.Person.CustomAccessDeniedException;
 import nsu.kardash.backendsportevents.exceptions.Person.PersonNotFoundException;
 import nsu.kardash.backendsportevents.exceptions.Role.RoleNotFoundException;
 import nsu.kardash.backendsportevents.models.Person;
 import nsu.kardash.backendsportevents.repositories.PeopleRepository;
 import nsu.kardash.backendsportevents.repositories.RoleRepository;
+import nsu.kardash.backendsportevents.repositories.Specifications.PersonSpecifications;
 import nsu.kardash.backendsportevents.security.PersonDetails;
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.validation.BindingResult;
 
 import java.time.OffsetDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +41,14 @@ public class PersonService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final ModelMapper modelMapper;
+
+    public Person getPersonById(long id) {
+        return peopleRepository.findById(id).orElseThrow(() -> new PersonNotFoundException("Person not found"));
+    }
+
+    public Person getPersonByEmail(String email) {
+        return peopleRepository.findByEmail(email).orElseThrow(() -> new PersonNotFoundException("Person not found"));
+    }
 
     public CabinetResponse getCabinet(long personId) {
 
@@ -49,7 +71,7 @@ public class PersonService {
     }
 
     public void setEmailVerified(String email) {
-        Person person = peopleRepository.findByEmail(email).orElseThrow(() -> new PersonNotFoundException( "Person not found"));
+        Person person = peopleRepository.findByEmail(email).orElseThrow(() -> new PersonNotFoundException("Person not found"));
         person.setEmailVerified(true);
         person.setUpdatedAt(OffsetDateTime.now());
         peopleRepository.save(person);
@@ -66,7 +88,8 @@ public class PersonService {
         person.setPassword(passwordEncoder.encode(person.getPassword()));
         person.setEmailVerified(false);
         enrichPerson(person);
-        if (person.getRole() == null) person.setRole(roleRepository.findByName("USER").orElseThrow(() -> new RoleNotFoundException("Role not found")));
+        if (person.getRole() == null)
+            person.setRole(roleRepository.findByName("USER").orElseThrow(() -> new RoleNotFoundException("Role not found")));
         peopleRepository.save(person);
     }
 
@@ -79,4 +102,77 @@ public class PersonService {
         person.setUpdatedAt(OffsetDateTime.now());
     }
 
+    public OkResponse updatePerson(@Valid UpdatePersonDTO updatePersonDTO, BindingResult bindingResult) {
+
+        ValidationService.checkValidationErrors(bindingResult);
+
+        Person person = peopleRepository.getReferenceById(getCurrentId());
+
+        if (updatePersonDTO.getEmail() != null && !updatePersonDTO.getEmail().isBlank())
+            person.setEmail(updatePersonDTO.getEmail());
+        if (updatePersonDTO.getFirstname() != null && !updatePersonDTO.getFirstname().isBlank())
+            person.setFirstname(updatePersonDTO.getFirstname());
+        if (updatePersonDTO.getLastname() != null && !updatePersonDTO.getLastname().isBlank())
+            person.setLastname(updatePersonDTO.getLastname());
+        if (updatePersonDTO.getSurname() != null && !updatePersonDTO.getSurname().isBlank())
+            person.setSurname(updatePersonDTO.getSurname());
+        if (updatePersonDTO.getPassword() != null && !updatePersonDTO.getPassword().isBlank())
+            person.setPassword(passwordEncoder.encode(updatePersonDTO.getPassword()));
+
+        person.setUpdatedAt(OffsetDateTime.now());
+
+        peopleRepository.save(person);
+
+        return new OkResponse("Person updated successfully");
+    }
+
+    public OkResponse deletePerson() {
+
+        peopleRepository.deleteById(getCurrentId());
+
+        return new OkResponse("Person deleted successfully");
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN', 'ROOT')")
+    @Cacheable(
+            value = "personFilteredInfo",
+            key = "#page + '-' + #size + '-' + T(org.springframework.util.StringUtils).collectionToDelimitedString(#allParams.entrySet(), ',')"
+    )
+    public Page<PersonResponse> findByFilters(Map<String, String> allParams, int page, int size, String[] sort) {
+        // выделяем из allParams только filter-поля, убираем page,size,sort
+        var filters = new HashMap<>(allParams);
+        filters.remove("page");
+        filters.remove("size");
+        filters.remove("sort");
+
+        // создаём объект Sort
+        Sort sortObj = Sort.by(
+                Sort.Order.by(sort[0]).with(sort.length > 1 && sort[1].equalsIgnoreCase("desc")
+                        ? Sort.Direction.DESC
+                        : Sort.Direction.ASC)
+        );
+        Pageable pageable = PageRequest.of(page, size, sortObj);
+
+        Specification<Person> spec = Specification.where(null);
+
+        for (var entry : filters.entrySet()) {
+            spec = spec.and(PersonSpecifications.hasAttribute(entry.getKey(), entry.getValue()));
+        }
+
+        return peopleRepository.findAll(spec, pageable).map(this::convertPersonToResponse);
+    }
+
+    public PersonResponse convertPersonToResponse(Person person) {
+        return new PersonResponse(
+                person.getId(),
+                person.getRole().getName(),
+                person.getFirstname(),
+                person.getSurname(),
+                person.getLastname(),
+                person.getEmail(),
+                person.isEmailVerified(),
+                person.getCreatedAt(),
+                person.getUpdatedAt()
+        );
+    }
 }

@@ -32,8 +32,6 @@ public class RedisConfig {
 
     @Bean
     public RedisCacheConfiguration cacheConfiguration() {
-        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer();
-
         return RedisCacheConfiguration.defaultCacheConfig()
                 // глобально задаём TTL для всех кэшей, если не переопределено в @Cacheable
                 .entryTtl(Duration.ofMinutes(5))

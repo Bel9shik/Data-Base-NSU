@@ -5,8 +5,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
 import org.springframework.mail.SimpleMailMessage;
+import org.springframework.retry.annotation.EnableRetry;
 
 @Configuration
+@EnableRetry
 public class SpringConfig {
 
     @Bean
