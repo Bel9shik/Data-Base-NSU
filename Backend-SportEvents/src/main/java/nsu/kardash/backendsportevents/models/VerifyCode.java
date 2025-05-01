@@ -15,4 +15,6 @@ public class VerifyCode implements Serializable {
 
     private int code;
 
+    private boolean verified;
+
 }

@@ -1,10 +1,7 @@
 package nsu.kardash.backendsportevents.handlers;
 
 import com.auth0.jwt.exceptions.SignatureVerificationException;
-import nsu.kardash.backendsportevents.dto.responses.errors.EventErrorResponse;
-import nsu.kardash.backendsportevents.dto.responses.errors.FilterErrorResponse;
-import nsu.kardash.backendsportevents.dto.responses.errors.PersonErrorResponse;
-import nsu.kardash.backendsportevents.dto.responses.errors.ValidationErrorResponse;
+import nsu.kardash.backendsportevents.dto.responses.errors.*;
 import nsu.kardash.backendsportevents.exceptions.Event.EventNotFoundException;
 import nsu.kardash.backendsportevents.exceptions.Filters.FilterNotFoundException;
 import nsu.kardash.backendsportevents.exceptions.Person.*;
@@ -136,5 +133,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .badRequest()
                 .body(new ValidationErrorResponse(Map.of("error", e.getMessage().substring(e.getMessage().indexOf('\"'), e.getMessage().lastIndexOf('\"'))), System.currentTimeMillis()));
+    }
+
+    @ExceptionHandler (VerifyCodeException.class)
+    private ResponseEntity<VerifyCodeErrorResponse> handleException(VerifyCodeException e) {
+        return ResponseEntity
+                .badRequest()
+                .body(new VerifyCodeErrorResponse(e.getMessage(), System.currentTimeMillis()));
     }
 }

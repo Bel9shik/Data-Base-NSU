@@ -53,7 +53,6 @@ public class RegistrationController {
         return ResponseEntity
                 .ok()
                 .body(registrationService.confirmCode(verifyAccountDTO, bindingResult));
-
     }
 
 }

@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.OpenAPI31;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import nsu.kardash.backendsportevents.dto.requests.UpdatePersonDTO;
@@ -61,7 +62,17 @@ public class PersonController {
     public ResponseEntity<?> resetPassword(@RequestParam @Email @NotNull String email) {
         return ResponseEntity
                 .ok()
-                .body(registrationService.resetPassword(email));
+                .body(personService.resetPassword(email));
+    }
+
+    @PostMapping("/changePassword")
+    @Operation(
+            summary = "All access. Смена пароля пользователя"
+    )
+    public ResponseEntity<?> changePassword(@RequestParam(defaultValue = "a.kardash@g.nsu.ru") @Email @NotNull String email, @RequestParam(defaultValue = "1234")@NotBlank String password) {
+        return ResponseEntity
+                .ok()
+                .body(personService.changePassword(email, password));
     }
 
     @GetMapping("/showFilteredUsers")

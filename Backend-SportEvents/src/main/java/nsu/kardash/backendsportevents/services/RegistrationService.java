@@ -4,11 +4,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import nsu.kardash.backendsportevents.dto.requests.RegistrationDTO;
 import nsu.kardash.backendsportevents.dto.requests.VerifyAccountDTO;
-import nsu.kardash.backendsportevents.dto.responses.positive.OkResponse;
 import nsu.kardash.backendsportevents.dto.responses.positive.RegistrationResponse;
 import nsu.kardash.backendsportevents.exceptions.Person.ConfirmEmailException;
 import nsu.kardash.backendsportevents.exceptions.Person.PersonNotCreatedException;
-import nsu.kardash.backendsportevents.exceptions.Person.PersonNotFoundException;
+import nsu.kardash.backendsportevents.exceptions.Person.VerifyCodeException;
 import nsu.kardash.backendsportevents.models.Person;
 import nsu.kardash.backendsportevents.models.VerifyCode;
 import org.springframework.stereotype.Service;
@@ -48,9 +47,9 @@ public class RegistrationService {
 
         if (person.isEmailVerified()) throw new ConfirmEmailException(Map.of("error", "email already verified"));
 
-        VerifyCode verifyCode = new VerifyCode(email, generateVerifyCode()); //5 min за счёт TTL Redis
+        VerifyCode verifyCode = new VerifyCode(email, generateVerifyCode(), false); //5 min за счёт TTL Redis
 
-        redisService.add(verifyCode);
+        redisService.addVerifyCode(verifyCode);
 
         mailSenderService.sendNotifyEmail(verifyCode.getEmail(), verifyCode.getCode());
 
@@ -64,33 +63,22 @@ public class RegistrationService {
         VerifyCode verifyCode = redisService.findVerifyCode(verifyAccountDTO.getEmail());
 
         if (verifyCode == null) {
-             throw new ConfirmEmailException(Map.of("error", "Verification code expired"));
+            throw new VerifyCodeException("Verification code expired");
         }
 
         if (verifyCode.getCode() == verifyAccountDTO.getVerifyCode()) {
             personService.setEmailVerified(verifyAccountDTO.getEmail());
-            return new RegistrationResponse("Code verified");
         } else {
-            throw new ConfirmEmailException(Map.of("error", "Verification code invalid"));
+            throw new VerifyCodeException("Verification code invalid");
         }
 
+        verifyCode.setVerified(true);
+        redisService.addVerifyCode(verifyCode);
+
+        return new RegistrationResponse("Code verified");
     }
 
-    public OkResponse resetPassword(String email) {
-
-        Person person = personService.getPersonByEmail(email);
-
-        VerifyCode verifyCode = new VerifyCode(email, generateVerifyCode()); //5 min за счёт TTL Redis
-
-        redisService.add(verifyCode);
-
-        mailSenderService.sendNotifyEmailResetPassword(verifyCode.getEmail(), verifyCode.getCode());
-
-        return new OkResponse("Email sent");
-
-    }
-
-    private int generateVerifyCode() {
+    public static int generateVerifyCode() {
         return (int)(Math.random() * 900000) + 100000; // in range [100000;999999]
     }
 

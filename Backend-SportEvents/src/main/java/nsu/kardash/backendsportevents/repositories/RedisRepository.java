@@ -7,9 +7,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface RedisRepository {
 
-    void add(VerifyCode verifyCode);
+    void addVerifyCode(VerifyCode verifyCode);
 
-    void delete(String email);
+    void deleteVerifyCode(String email);
 
     VerifyCode findVerifyCode(String email);
 

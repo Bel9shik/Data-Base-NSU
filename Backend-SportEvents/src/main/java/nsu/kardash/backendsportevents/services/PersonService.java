@@ -9,8 +9,10 @@ import nsu.kardash.backendsportevents.dto.responses.positive.OkResponse;
 import nsu.kardash.backendsportevents.dto.responses.positive.PersonResponse;
 import nsu.kardash.backendsportevents.exceptions.Person.CustomAccessDeniedException;
 import nsu.kardash.backendsportevents.exceptions.Person.PersonNotFoundException;
+import nsu.kardash.backendsportevents.exceptions.Person.VerifyCodeException;
 import nsu.kardash.backendsportevents.exceptions.Role.RoleNotFoundException;
 import nsu.kardash.backendsportevents.models.Person;
+import nsu.kardash.backendsportevents.models.VerifyCode;
 import nsu.kardash.backendsportevents.repositories.PeopleRepository;
 import nsu.kardash.backendsportevents.repositories.RoleRepository;
 import nsu.kardash.backendsportevents.repositories.Specifications.PersonSpecifications;
@@ -41,6 +43,8 @@ public class PersonService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final ModelMapper modelMapper;
+    private final RedisService redisService;
+    private final MailSenderService mailSenderService;
 
     public Person getPersonById(long id) {
         return peopleRepository.findById(id).orElseThrow(() -> new PersonNotFoundException("Person not found"));
@@ -48,6 +52,42 @@ public class PersonService {
 
     public Person getPersonByEmail(String email) {
         return peopleRepository.findByEmail(email).orElseThrow(() -> new PersonNotFoundException("Person not found"));
+    }
+
+    public OkResponse resetPassword(String email) {
+
+        Person person = getPersonByEmail(email);
+
+        VerifyCode verifyCode = new VerifyCode(email, RegistrationService.generateVerifyCode(), false); //5 min за счёт TTL Redis
+
+        redisService.addVerifyCode(verifyCode);
+
+        mailSenderService.sendNotifyEmailResetPassword(verifyCode.getEmail(), verifyCode.getCode());
+
+        return new OkResponse("Email sent");
+
+    }
+
+    public OkResponse changePassword(String email, String newPassword) {
+
+        VerifyCode verifyCode = redisService.findVerifyCode(email);
+
+        if (verifyCode == null) {
+            throw new VerifyCodeException("Verification code expired");
+        }
+
+        Person person = getPersonByEmail(email);
+
+        if (!verifyCode.isVerified()) throw new VerifyCodeException("Verification code not verified");
+
+        person.setPassword(passwordEncoder.encode(newPassword));
+
+        peopleRepository.save(person);
+
+        redisService.deleteVerifyCode(email);
+
+        return new OkResponse("Password changed successfully");
+
     }
 
     public CabinetResponse getCabinet(long personId) {
